@@ -39,8 +39,4 @@
   }
 }
 
-.theme-toggle-btn:hover {
-  border-color: var(--accent-cyan) !important;
-  box-shadow: 0 4px 20px var(--accent-cyan-glow) !important;
-  transform: translateY(-1px);
-}
+

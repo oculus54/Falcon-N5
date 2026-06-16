@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import Antigravity from './components/Antigravity';
-import { Sun, Moon } from 'lucide-react';
+import DarkVeil from './components/DarkVeil';
+import DecryptedText from './components/DecryptedText';
+
 import StaggeredMenu from './components/StaggeredMenu';
 import HomePage from './components/HomePage';
 import ToolPage from './components/ToolPage';
@@ -21,19 +22,11 @@ const socialItems = [
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('theme') || 'light';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('theme', nextTheme);
-  };
+  const theme = 'dark';
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }, []);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -60,22 +53,13 @@ function App() {
       
       {/* Fixed Full-Screen Interactive Canvas Background */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
-        <Antigravity
-          count={300}
-          magnetRadius={6}
-          ringRadius={7}
-          waveSpeed={0.4}
-          waveAmplitude={1}
-          particleSize={1.5}
-          lerpSpeed={0.05}
-          color="#5227FF"
-          autoAnimate
-          particleVariance={1}
-          rotationSpeed={0}
-          depthFactor={1}
-          pulseSpeed={3}
-          particleShape="capsule"
-          fieldStrength={10}
+        <DarkVeil
+          hueShift={0}
+          noiseIntensity={0}
+          scanlineIntensity={0}
+          speed={0.5}
+          scanlineFrequency={0}
+          warpAmount={0}
         />
       </div>
 
@@ -121,39 +105,17 @@ function App() {
             </linearGradient>
           </defs>
         </svg>
-        <span style={{ fontWeight: '600' }}>Falcon-N5</span>
+        <span style={{ fontWeight: '600' }}>
+          <DecryptedText
+            text="Falcon-N5"
+            animateOn="hover"
+            speed={80}
+            maxIterations={15}
+          />
+        </span>
       </a>
 
-      {/* Floating Theme Toggle Control */}
-      <button 
-        onClick={toggleTheme} 
-        style={{ 
-          position: 'fixed',
-          top: '24px',
-          right: '160px',
-          zIndex: 50,
-          padding: '8px 14px', 
-          fontSize: '0.75rem', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '6px',
-          borderRadius: '30px',
-          border: '1px solid var(--border-color)',
-          background: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          cursor: 'pointer',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.06)',
-          fontFamily: 'var(--font-sans)',
-          fontWeight: 600,
-          pointerEvents: 'auto',
-          transition: 'all var(--transition-fast)'
-        }}
-        className="theme-toggle-btn"
-        aria-label="Toggle light and dark theme"
-      >
-        {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
-        <span>{theme === 'dark' ? 'LIGHT' : 'DARK'}</span>
-      </button>
+
 
       {/* Staggered Navigation Menu Overlay (mounted at top level, fixed) */}
       <StaggeredMenu
@@ -172,7 +134,7 @@ function App() {
       />
 
       {/* Page Routing Contents */}
-      <main style={{ flex: 1, position: 'relative', zIndex: 1, pointerEvents: 'none' }}>
+      <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
         {currentPage === 'home' && <HomePage theme={theme} />}
         {currentPage === 'tool' && <ToolPage theme={theme} />}
         {currentPage === 'features' && <FeaturesPage theme={theme} />}
@@ -192,15 +154,8 @@ function App() {
         zIndex: 5,
         marginTop: '60px'
       }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <span>© 2026 FALCON-N5 CORE LABS.</span>
-          <span style={{ color: 'var(--text-secondary)' }}>
-            "Building Trust in the Age of AI-Generated Content."
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-            <span style={{ display: 'inline-block', width: '6px', height: '6px', background: 'var(--accent-green)', borderRadius: '50%' }} />
-            VAULT PROTOCOLS SECURED
-          </span>
         </div>
       </footer>
 

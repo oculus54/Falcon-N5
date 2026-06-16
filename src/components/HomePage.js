@@ -1,5 +1,8 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import GradientText from './GradientText';
+import DecryptedText from './DecryptedText';
+import TextType from './TextType';
 
 const STATS = [
   { value: '95%+', label: 'Detection Accuracy' },
@@ -38,7 +41,12 @@ export default function HomePage() {
             color: 'var(--text-primary)',
             letterSpacing: '-0.3px'
           }}>
-            Falcon-N5
+            <DecryptedText
+              text="Falcon-N5"
+              animateOn="hover"
+              speed={80}
+              maxIterations={15}
+            />
           </span>
         </div>
 
@@ -46,24 +54,30 @@ export default function HomePage() {
           fontFamily: 'var(--font-display)',
           fontSize: '4.2rem',
           fontWeight: 300,
-          color: 'var(--text-primary)',
           letterSpacing: '-2.2px',
           lineHeight: '1.15',
           maxWidth: '900px',
           margin: '0 auto 28px auto',
           textAlign: 'center'
         }}>
-          Detect image manipulation with AI precision
+          <GradientText
+            colors={["#5227FF", "#FF9FFC", "#B497CF"]}
+            animationSpeed={8}
+            showBorder={false}
+          >
+            Detect image manipulation with AI precision
+          </GradientText>
         </h1>
+
         <p style={{
           color: 'var(--text-secondary)',
           fontSize: '1.2rem',
-          maxWidth: '800px',
-          margin: '0 auto 36px auto',
+          fontWeight: 300,
           lineHeight: '1.7',
-          fontWeight: '300'
+          maxWidth: '800px',
+          margin: '0 auto 36px auto'
         }}>
-          Advanced deep learning technology that instantly analyzes images and identifies AI-generated, edited, deepfake, or manipulated content with high accuracy. Empowering users, researchers, journalists, and organizations to verify digital authenticity in seconds.
+          Advanced deep learning technology that instantly analyzes images and identifies AI-generated, edited, deepfake, or manipulated content in seconds.
         </p>
 
         {/* CTA Buttons */}
@@ -74,6 +88,36 @@ export default function HomePage() {
           <a href="#/features" className="cyber-btn cyber-btn-secondary" style={{ padding: '14px 28px', fontSize: '0.95rem' }}>
             Learn More
           </a>
+        </div>
+
+        {/* Dynamic capability typing indicator */}
+        <div style={{
+          marginTop: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.78rem',
+          color: 'var(--text-muted)',
+          letterSpacing: '0.5px'
+        }}>
+          <span style={{ color: 'var(--accent-cyan)', opacity: 0.7 }}>›</span>
+          <TextType
+            text={[
+              'Detecting GAN artifacts in portraits',
+              'Analyzing EXIF metadata signatures',
+              'Scanning for ELA compression mismatches',
+              'Verifying PRNU sensor fingerprints',
+              'Identifying deepfake neural patterns'
+            ]}
+            typingSpeed={55}
+            deletingSpeed={35}
+            pauseDuration={2200}
+            loop
+            showCursor
+            cursorCharacter="_"
+          />
         </div>
       </div>
 
@@ -105,7 +149,7 @@ export default function HomePage() {
             fontSize: '1.05rem',
             color: 'var(--text-secondary)',
             lineHeight: '1.8',
-            fontWeight: '300'
+            fontWeight: 300
           }}>
             Falcon-N5 is an intelligent image authentication platform designed to combat misinformation and digital image manipulation. By leveraging cutting-edge artificial intelligence and computer vision techniques, Falcon-N5 helps users determine whether an image is authentic or has been altered, supporting trust and transparency in the digital world.
           </p>

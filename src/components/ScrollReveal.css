@@ -1,0 +1,58 @@
+.scroll-reveal {
+  margin: 20px 0;
+  display: block;
+}
+
+.scroll-reveal-text {
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.word {
+  display: inline-block;
+  white-space: pre;
+}
+
+/* Custom Shape Overrides for Falcon-N5 Sections */
+.hero-scroll-reveal {
+  font-size: 1.2rem !important;
+  line-height: 1.7 !important;
+  font-weight: 300 !important;
+  color: var(--text-secondary) !important;
+}
+
+.about-scroll-reveal {
+  font-size: 1.05rem !important;
+  line-height: 1.8 !important;
+  font-weight: 300 !important;
+  color: var(--text-secondary) !important;
+}
+
+.features-desc-text {
+  font-size: 1.05rem !important;
+  line-height: 1.7 !important;
+  font-weight: 300 !important;
+  color: var(--text-secondary) !important;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.features-desc-container {
+  display: flex;
+  justify-content: center;
+}
+
+.tool-desc-text {
+  font-size: 1rem !important;
+  line-height: 1.7 !important;
+  font-weight: 300 !important;
+  color: var(--text-secondary) !important;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.tool-desc-container {
+  display: flex;
+  justify-content: center;
+}

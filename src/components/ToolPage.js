@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, ArrowLeft, ShieldAlert, Cpu, CheckCircle, FileText, Activity } from 'lucide-react';
+import DecryptedText from './DecryptedText';
 
 const PRESETS = [
   {
@@ -474,9 +475,16 @@ export default function ToolPage({ theme }) {
         <div>
           <div style={{ textAlign: 'center', marginBottom: '50px' }}>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.8px', marginBottom: '12px' }}>
-              Falcon-N5 analysis scanner
+              <DecryptedText
+                text="Falcon-N5 analysis scanner"
+                animateOn="view"
+                speed={50}
+                maxIterations={20}
+                sequential
+                revealDirection="start"
+              />
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.7', fontWeight: 300 }}>
               Select a demo preset or upload your own file to inspect EXIF metadata, JPEG Error levels, and generative AI noise signatures.
             </p>
           </div>

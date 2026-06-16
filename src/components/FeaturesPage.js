@@ -1,5 +1,7 @@
 import React from 'react';
 import { Shield, BrainCircuit, Binary, FileSearch } from 'lucide-react';
+import DecryptedText from './DecryptedText';
+import ScrollStack, { ScrollStackItem } from './ScrollStack';
 
 const SECTIONS = [
   {
@@ -38,9 +40,9 @@ const SECTIONS = [
 
 export default function FeaturesPage() {
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', position: 'relative', zIndex: 1 }}>
-      {/* Title */}
-      <div style={{ textAlign: 'center', marginBottom: '50px' }}>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      {/* Title — outside the scroll stack so it's static */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 0', textAlign: 'center', marginBottom: '10px' }}>
         <span className="cyber-badge cyber-badge-magenta" style={{ marginBottom: '16px' }}>
           Science Protocol
         </span>
@@ -52,96 +54,138 @@ export default function FeaturesPage() {
           letterSpacing: '-1px',
           marginBottom: '16px'
         }}>
-          Forensics Science Lab
+          <DecryptedText
+            text="Forensics Science Lab"
+            animateOn="view"
+            speed={60}
+            maxIterations={20}
+            sequential
+            revealDirection="start"
+          />
         </h1>
         <p style={{
           color: 'var(--text-secondary)',
           maxWidth: '600px',
           margin: '0 auto',
           fontSize: '1.05rem',
-          lineHeight: '1.6'
+          lineHeight: '1.7',
+          fontWeight: 300
         }}>
           Learn how digital forensics algorithms analyze pixels to discover evidence of forgery, generative AI modifications, and metadata tamper trails.
         </p>
       </div>
 
-      {/* Grid of Forensics Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+      {/* Scroll-stacking cards */}
+      <ScrollStack
+        useWindowScroll
+        itemDistance={120}
+        itemScale={0.04}
+        itemStackDistance={24}
+        stackPosition="15%"
+        scaleEndPosition="8%"
+        baseScale={0.88}
+        rotationAmount={0}
+        blurAmount={0}
+      >
         {SECTIONS.map((section, index) => {
           const Icon = section.icon;
           return (
-            <div
-              key={index}
-              className="cyber-card"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
-                borderLeft: `2px solid ${section.accent}`
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: section.accent
-                }}>
-                  <Icon size={24} />
-                </div>
-                <span className="cyber-badge" style={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.03)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-secondary)'
-                }}>
-                  {section.badge}
-                </span>
-              </div>
-
-              <div>
-                <h2 style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.20rem',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  marginBottom: '10px',
-                  letterSpacing: '-0.2px'
-                }}>
-                  {section.title}
-                </h2>
-                <p style={{
-                  fontSize: '0.85rem',
-                  color: 'var(--text-secondary)',
-                  lineHeight: '1.6',
-                  marginBottom: '15px'
-                }}>
-                  {section.description}
-                </p>
-              </div>
-
+            <ScrollStackItem key={index}>
               <div style={{
-                background: 'rgba(82, 39, 255, 0.03)',
-                padding: '16px',
-                borderRadius: '8px',
+                maxWidth: '900px',
+                margin: '0 auto',
+                background: 'var(--bg-card)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid var(--border-color)',
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.5',
-                flex: 1
+                borderLeft: `3px solid ${section.accent}`,
+                borderRadius: '16px',
+                padding: '36px 40px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '40px',
+                alignItems: 'start'
               }}>
-                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '6px', fontSize: '0.75rem', fontFamily: 'var(--font-display)' }}>
-                  TECHNICAL SPECIFICATIONS:
-                </strong>
-                {section.science}
+                {/* Left column */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '10px',
+                      background: `${section.accent}15`,
+                      border: `1px solid ${section.accent}40`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: section.accent,
+                      flexShrink: 0
+                    }}>
+                      <Icon size={22} />
+                    </div>
+                    <span className="cyber-badge" style={{
+                      borderColor: `${section.accent}50`,
+                      color: section.accent,
+                      background: `${section.accent}10`
+                    }}>
+                      {section.badge}
+                    </span>
+                  </div>
+
+                  <h2 style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '1.5rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    marginBottom: '12px',
+                    letterSpacing: '-0.3px'
+                  }}>
+                    {section.title}
+                  </h2>
+                  <p style={{
+                    fontSize: '0.9rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: '1.7',
+                    fontWeight: 300
+                  }}>
+                    {section.description}
+                  </p>
+                </div>
+
+                {/* Right column — tech specs */}
+                <div style={{
+                  background: 'rgba(82, 39, 255, 0.03)',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                }}>
+                  <strong style={{
+                    color: section.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginBottom: '12px',
+                    fontSize: '0.7rem',
+                    letterSpacing: '1.5px',
+                    textTransform: 'uppercase',
+                    fontFamily: 'var(--font-display)'
+                  }}>
+                    Technical Specifications
+                  </strong>
+                  <p style={{
+                    fontSize: '0.82rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: '1.7',
+                    fontWeight: 300
+                  }}>
+                    {section.science}
+                  </p>
+                </div>
               </div>
-            </div>
+            </ScrollStackItem>
           );
         })}
-      </div>
+      </ScrollStack>
     </div>
   );
 }
