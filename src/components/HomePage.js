@@ -1,12 +1,11 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import { motion } from 'motion/react';
 import GradientText from './GradientText';
-import DecryptedText from './DecryptedText';
 import TextType from './TextType';
 
 const STATS = [
   { value: '95%+', label: 'Detection Accuracy' },
-  { value: '50K+', label: 'Images Analyzed' },
   { value: 'Instant', label: 'Real-Time Processing' },
   { value: 'Multi-Model', label: 'AI & Deepfake Support' }
 ];
@@ -41,12 +40,7 @@ export default function HomePage() {
             color: 'var(--text-primary)',
             letterSpacing: '-0.3px'
           }}>
-            <DecryptedText
-              text="Falcon-N5"
-              animateOn="hover"
-              speed={80}
-              maxIterations={15}
-            />
+            Falcon-N5
           </span>
         </div>
 
@@ -123,18 +117,26 @@ export default function HomePage() {
 
 
       {/* About Section */}
-      <div className="cyber-card" style={{
-        padding: '40px',
-        marginBottom: '80px',
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)'
-      }}>
+      <motion.div 
+        className="cyber-card" 
+        initial={{ scale: 0.85, opacity: 0, y: 30 }}
+        whileInView={{ scale: 1, opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.15 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          padding: '40px',
+          marginBottom: '80px',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)',
+          pointerEvents: 'auto'
+        }}
+      >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '40px', alignItems: 'center' }}>
           <div>
             <h2 style={{
               fontFamily: 'var(--font-display)',
-              fontSize: '2rem',
+              fontSize: '2.5rem',
               color: 'var(--text-primary)',
               fontWeight: 500,
               letterSpacing: '-0.5px',
@@ -154,10 +156,17 @@ export default function HomePage() {
             Falcon-N5 is an intelligent image authentication platform designed to combat misinformation and digital image manipulation. By leveraging cutting-edge artificial intelligence and computer vision techniques, Falcon-N5 helps users determine whether an image is authentic or has been altered, supporting trust and transparency in the digital world.
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Statistics Section */}
-      <div className="cyber-card" style={{ padding: '30px 20px', marginBottom: '40px' }}>
+      <motion.div 
+        className="cyber-card" 
+        initial={{ scale: 0.85, opacity: 0, y: 30 }}
+        whileInView={{ scale: 1, opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.15 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+        style={{ padding: '30px 20px', marginBottom: '40px', pointerEvents: 'auto' }}
+      >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '30px', textAlign: 'center' }}>
           {STATS.map((stat, idx) => (
             <div key={idx}>
@@ -177,7 +186,7 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
     </div>
   );

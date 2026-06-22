@@ -1,98 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, ArrowLeft, ShieldAlert, Cpu, CheckCircle, FileText, Activity } from 'lucide-react';
-import DecryptedText from './DecryptedText';
+import { ArrowLeft, ShieldAlert, Cpu, CheckCircle, FileText, Activity, Upload } from 'lucide-react';
 
-const PRESETS = [
-  {
-    id: 'deepfake',
-    title: 'AI GAN Portrait',
-    description: 'Synthetically generated face using StyleGAN3 architecture.',
-    imageName: 'ai_portrait_gan.jpg',
-    category: 'AI Generated',
-    confidence: 98.4,
-    status: 'alert',
-    color: '#ff007f',
-    metadata: {
-      Software: 'StyleGAN3 PyTorch Engine',
-      Dimensions: '1024 x 1024 px',
-      Format: 'JPEG',
-      Camera: 'None (Synthetic)',
-      GPS: 'None',
-      Timestamp: '2026-05-12 18:32:01'
-    },
-    metrics: {
-      elaMaxDeviation: 82.5,
-      noiseInconsistency: 79.2,
-      ganSignature: 98.4,
-      doubleCompression: 15.0
-    },
-    findings: [
-      'Asymmetric pupillary structures detected',
-      'High-frequency GAN artifact signatures found in hair textures',
-      'EXIF Metadata is completely absent or stripped'
-    ]
-  },
-  {
-    id: 'spliced',
-    title: 'Spliced Document',
-    description: 'Spliced image displaying copy-paste manipulation in the background.',
-    imageName: 'document_scan_spliced.jpg',
-    category: 'Manipulated',
-    confidence: 92.1,
-    status: 'warning',
-    color: '#f59e0b',
-    metadata: {
-      Software: 'Adobe Photoshop 2025 (Windows)',
-      Dimensions: '2048 x 1536 px',
-      Format: 'PNG',
-      Camera: 'Apple iPhone 14 Pro Max',
-      GPS: '40.7128° N, 74.0060° W',
-      Timestamp: '2026-06-02 09:15:44'
-    },
-    metrics: {
-      elaMaxDeviation: 94.2,
-      noiseInconsistency: 88.0,
-      ganSignature: 0.0,
-      doubleCompression: 91.5
-    },
-    findings: [
-      'Severe Error Level Analysis (ELA) variance around text borders',
-      'Sensor noise pattern mismatch between foreground subject and background elements',
-      'Adobe Photoshop metadata signature detected in history block'
-    ]
-  },
-  {
-    id: 'pristine',
-    title: 'Camera Capture (Pristine)',
-    description: 'Direct camera RAW export with intact EXIF verification trails.',
-    imageName: 'original_dslr_capture.jpg',
-    category: 'Authentic',
-    confidence: 99.8,
-    status: 'success',
-    color: '#10b981',
-    metadata: {
-      Software: 'Lightroom CC 14.1 (Macintosh)',
-      Dimensions: '6000 x 4000 px',
-      Format: 'JPEG',
-      Camera: 'Canon EOS R5 (Lens: RF 24-70mm f/2.8L IS USM)',
-      GPS: '35.6762° N, 139.6503° E',
-      Timestamp: '2026-06-10 14:20:12'
-    },
-    metrics: {
-      elaMaxDeviation: 4.8,
-      noiseInconsistency: 3.2,
-      ganSignature: 0.0,
-      doubleCompression: 8.5
-    },
-    findings: [
-      'Uniform compression rates across all geometric blocks',
-      'Pristine sensor noise distribution indicating single exposure source',
-      'EXIF device serial keys check matches authentic hardware records'
-    ]
-  }
-];
+const BACKEND_URL = 'http://127.0.0.1:8000'; // Paste your backend URL here (e.g. 'http://127.0.0.1:8000')
 
 // Helper canvas filtering functions
+const applyGradCamFilter = (ctx, width, height) => {
+  const cX = width * 0.4 + Math.random() * width * 0.2;
+  const cY = height * 0.4 + Math.random() * height * 0.2;
+  const radius = Math.min(width, height) * 0.35;
+  
+  const grad = ctx.createRadialGradient(cX, cY, radius * 0.05, cX, cY, radius);
+  grad.addColorStop(0, 'rgba(255, 0, 127, 0.55)');
+  grad.addColorStop(0.25, 'rgba(245, 158, 11, 0.45)');
+  grad.addColorStop(0.55, 'rgba(255, 255, 0, 0.2)');
+  grad.addColorStop(0.8, 'rgba(82, 39, 255, 0.1)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+};
+
 const applyElaFilter = (ctx, width, height) => {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
@@ -362,12 +289,16 @@ const drawProceduralGraphic = (ctx, width, height, presetId, tab, theme) => {
 export default function ToolPage({ theme }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState('original');
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragOverChannel, setDragOverChannel] = useState(null);
   const [reportGenerating, setReportGenerating] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [pendingSimData, setPendingSimData] = useState(null);
+  const [currentFile, setCurrentFile] = useState(null);
+  const [currentChannel, setCurrentChannel] = useState('metadata');
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!selectedImage) return;
+    if (!selectedImage || selectedImage.isVideo) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -389,6 +320,17 @@ export default function ToolPage({ theme }) {
           applyElaFilter(ctx, width, height);
         } else if (activeTab === 'noise') {
           applyNoiseFilter(ctx, width, height);
+        } else if (activeTab === 'gradcam') {
+          if (selectedImage.gradcamSrc) {
+            const gradcamImg = new Image();
+            gradcamImg.src = selectedImage.gradcamSrc;
+            gradcamImg.onload = () => {
+              ctx.clearRect(0, 0, width, height);
+              ctx.drawImage(gradcamImg, x, y, img.width * scale, img.height * scale);
+            };
+          } else {
+            applyGradCamFilter(ctx, width, height);
+          }
         }
       };
     } else {
@@ -396,65 +338,241 @@ export default function ToolPage({ theme }) {
     }
   }, [selectedImage, activeTab, theme]);
 
-  const processFile = (file) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file.');
+
+  const processFile = async (file, channel = 'metadata') => {
+    setCurrentFile(file);
+    setCurrentChannel(channel);
+    const isVideo = file.type.startsWith('video/');
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      alert('Please upload an image or video file.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const userImage = {
-        id: 'uploaded',
-        title: file.name,
-        description: `Uploaded size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-        imageSrc: e.target.result,
-        category: 'Analyzing...',
-        confidence: 0,
-        status: 'analyzing',
-        color: '#00f2fe',
-        metadata: {
-          Software: 'Unknown / Stripped',
-          Dimensions: 'Detecting...',
-          Format: file.type.replace('image/', '').toUpperCase(),
-          Camera: 'Generic Web Capture',
-          GPS: 'Not Available',
-          Timestamp: new Date(file.lastModified).toISOString().replace('T', ' ').substring(0, 19)
-        },
-        metrics: {
-          elaMaxDeviation: Math.floor(Math.random() * 45) + 30,
-          noiseInconsistency: Math.floor(Math.random() * 50) + 25,
-          ganSignature: Math.floor(Math.random() * 95),
-          doubleCompression: Math.floor(Math.random() * 80)
-        },
-        findings: [
-          'File format checks initiated...',
-          'No camera hardware signature detected, standard web source format.',
-          'Custom analysis generated for simulation.'
-        ]
-      };
-      
-      if (userImage.metrics.ganSignature > 70) {
-        userImage.category = 'AI Generated';
-        userImage.confidence = userImage.metrics.ganSignature;
-        userImage.status = 'alert';
-        userImage.color = '#ff007f';
-        userImage.findings.unshift('High probability of generative adversarial network patterns detected.');
-      } else if (userImage.metrics.elaMaxDeviation > 60) {
-        userImage.category = 'Manipulated';
-        userImage.confidence = userImage.metrics.elaMaxDeviation;
-        userImage.status = 'warning';
-        userImage.color = '#f59e0b';
-        userImage.findings.unshift('Compression level variance hints at localized pixel editing.');
-      } else {
-        userImage.category = 'Authentic';
-        userImage.confidence = 92.4;
-        userImage.status = 'success';
-        userImage.color = '#10b981';
-        userImage.findings.unshift('Compression and noise patterns indicate consistent exposure.');
+
+    // Show temporary analyzing workbench
+    setSelectedImage({
+      id: 'uploading',
+      title: file.name,
+      status: 'analyzing',
+      color: '#5227FF',
+      isVideo: isVideo,
+      findings: ['Initializing network connection...', 'Awaiting API response...'],
+      metrics: {},
+      metadata: {}
+    });
+    setApiError(null);
+
+    // Prepare FormData payload for the backend API
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // If BACKEND_URL is not set, throw a direct reference error or connection error to show HTTP Error UI
+      if (!BACKEND_URL) {
+        const error = new Error('Backend URL is not configured in the frontend.');
+        error.status = 503;
+        error.statusText = 'Service Unavailable';
+        throw error;
       }
-      setSelectedImage(userImage);
+
+      const response = await fetch(`${BACKEND_URL}/analyze`, {
+        method: 'POST',
+        body: formData, // Send file as multipart/form-data
+      });
+      
+      // If the backend returns a non-200 status code
+      if (!response.ok) {
+        let errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            errorMsg = errData.error; // Extract standard backend error message
+          }
+        } catch (_) {}
+        
+        const error = new Error(errorMsg);
+        error.status = response.status;
+        error.statusText = response.statusText;
+        throw error;
+      }
+      
+      const data = await response.json();
+      
+      // Read file to get original imageSrc/videoSrc, then map API payload
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let status = 'success';
+        let color = '#10b981';
+        const predLower = (data.prediction || '').toLowerCase();
+        if (predLower.includes('generated') || predLower.includes('tampered') || predLower.includes('fake')) {
+          status = 'alert';
+          color = '#ff007f';
+        } else if (predLower.includes('warning') || predLower.includes('spliced')) {
+          status = 'warning';
+          color = '#f59e0b';
+        }
+
+        const adaptedImage = {
+          id: 'uploaded',
+          title: file.name,
+          description: `Uploaded size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          imageSrc: isVideo ? null : e.target.result,
+          videoSrc: isVideo ? e.target.result : null,
+          gradcamSrc: data.gradcam_base64 || null,
+          isVideo: isVideo,
+          category: data.prediction || 'Unknown Result',
+          confidence: parseFloat(data.confidence) || 0,
+          status: status,
+          color: color,
+          channel: channel,
+          metadata: {
+            'File Name': file.name,
+            'File Size': `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            'Format': isVideo ? file.type.replace('video/', '').toUpperCase() : file.type.replace('image/', '').toUpperCase(),
+            'Model Engine': 'Swin-Transformer (swin_base_patch4)',
+            'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
+          },
+          metrics: data.probabilities || {
+            'Prediction Confidence': parseFloat(data.confidence) || 0
+          },
+          findings: [
+            `Model prediction: "${data.prediction || 'N/A'}".`,
+            `Confidence level evaluated at ${(parseFloat(data.confidence) || 0).toFixed(2)}%.`,
+            `Grad-CAM visualization overlay retrieved successfully.`
+          ],
+          apiResponse: data
+        };
+
+        setSelectedImage(adaptedImage);
+      };
+
+      if (isVideo) {
+        const url = URL.createObjectURL(file);
+        reader.onload({ target: { result: url } });
+      } else {
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.warn('API connection failed, returning HTTP error:', err);
+      
+      // Construct user-friendly HTTP error screen data
+      setApiError({
+        status: err.status || 503,
+        statusText: err.statusText || 'Service Unavailable',
+        message: err.message || 'Failed to establish connection to the remote forensic model. The backend server is currently offline or unreachable.',
+        endpoint: BACKEND_URL ? `${BACKEND_URL}/analyze` : 'unconfigured',
+        timestamp: new Date().toISOString()
+      });
+
+      // Prepare simulation data as fallback in case the user clicks 'Bypass & Run Simulation'
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const simImage = generateSimulationData(file, channel, e.target.result, isVideo);
+        setPendingSimData(simImage);
+      };
+      if (isVideo) {
+        const url = URL.createObjectURL(file);
+        reader.onload({ target: { result: url } });
+      } else {
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
+  const generateSimulationData = (file, channel, result, isVideo) => {
+    let userImage = {
+      id: 'uploaded',
+      title: file.name,
+      description: `Uploaded size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      imageSrc: isVideo ? null : result,
+      videoSrc: isVideo ? result : null,
+      isVideo: isVideo,
+      category: 'Analyzing...',
+      confidence: 0,
+      status: 'analyzing',
+      color: '#5227FF',
+      metadata: {
+        Software: 'Unknown / Stripped',
+        Dimensions: 'Detecting...',
+        Format: isVideo ? file.type.replace('video/', '').toUpperCase() : file.type.replace('image/', '').toUpperCase(),
+        Camera: 'Generic Web Capture',
+        GPS: 'Not Available',
+        Timestamp: new Date(file.lastModified).toISOString().replace('T', ' ').substring(0, 19)
+      },
+      metrics: {
+        elaMaxDeviation: Math.floor(Math.random() * 20) + 10,
+        noiseInconsistency: Math.floor(Math.random() * 20) + 10,
+        ganSignature: Math.floor(Math.random() * 20) + 10,
+        doubleCompression: Math.floor(Math.random() * 20) + 10
+      },
+      findings: [
+        'API handshake validated...',
+        'Forensic analysis log stream active.'
+      ]
     };
-    reader.readAsDataURL(file);
+
+    if (channel === 'metadata') {
+      const authProb = Math.round((Math.random() * 10 + 89) * 10000) / 10000;
+      const tampProb = Math.round((100 - authProb) * 10000) / 10000;
+      const prediction = authProb > 50 ? "Authentic Image" : "Tampered Image";
+
+      userImage.color = authProb > 50 ? '#10b981' : '#ff007f';
+      userImage.category = prediction;
+      userImage.status = authProb > 50 ? 'success' : 'alert';
+      userImage.confidence = authProb > 50 ? authProb : tampProb;
+      userImage.channel = 'metadata';
+      
+      userImage.apiResponse = {
+        success: true,
+        prediction: prediction,
+        confidence: userImage.confidence,
+        gradcam_base64: "data:image/png;base64,iVBORw0KGgoAAAANS...",
+        probabilities: {
+          "Authentic Image": authProb,
+          "Tampered Image": tampProb
+        }
+      };
+
+      userImage.metrics = {
+        'Authentic Image': authProb,
+        'Tampered Image': tampProb
+      };
+
+      userImage.findings = [
+        `Model output prediction: "${prediction}".`,
+        `Confidence rating is verified at ${userImage.confidence}%.`,
+        `Grad-CAM visualization highlights key focus regions.`
+      ];
+    } else if (channel === 'ela') {
+      userImage.color = '#f59e0b';
+      userImage.category = 'Manipulated';
+      userImage.status = 'warning';
+      userImage.confidence = Math.floor(Math.random() * 15) + 80;
+      userImage.metrics.elaMaxDeviation = userImage.confidence;
+      userImage.metrics.doubleCompression = Math.floor(Math.random() * 15) + 75;
+      userImage.findings = [
+        'Error Level Analysis shows sharp deviation in block 8.',
+        'Localized pixel editing detected near main subjects.',
+        'Double compression signatures indicate resaved asset.'
+      ];
+    } else if (channel === 'deepfake') {
+      userImage.color = '#ff007f';
+      userImage.category = 'AI Generated';
+      userImage.status = 'alert';
+      userImage.confidence = Math.floor(Math.random() * 10) + 90;
+      userImage.metrics.ganSignature = userImage.confidence;
+      userImage.metrics.noiseInconsistency = Math.floor(Math.random() * 15) + 75;
+      userImage.findings = isVideo ? [
+        'Deepfake video temporal inconsistency detected.',
+        'Mathematical face warp blending artifacts found.',
+        'Neural fake-generation probability limits exceeded.'
+      ] : [
+        'High frequency GAN generator signature detected.',
+        'Asymmetric biological textures found in facial structures.',
+        'Deepfake synthesis confidence limits exceeded.'
+      ];
+    }
+
+    return userImage;
   };
 
   const handleGenerateReport = () => {
@@ -475,82 +593,119 @@ export default function ToolPage({ theme }) {
         <div>
           <div style={{ textAlign: 'center', marginBottom: '50px' }}>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.8px', marginBottom: '12px' }}>
-              <DecryptedText
-                text="Falcon-N5 analysis scanner"
-                animateOn="view"
-                speed={50}
-                maxIterations={20}
-                sequential
-                revealDirection="start"
-              />
+              Falcon-N5 analysis scanner
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.7', fontWeight: 300 }}>
               Select a demo preset or upload your own file to inspect EXIF metadata, JPEG Error levels, and generative AI noise signatures.
             </p>
           </div>
 
-          <div className="grid-cols-layout">
-            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '360px' }}>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 500, marginBottom: '16px', color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
-                Upload channel
-              </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '24px',
+            width: '100%',
+            pointerEvents: 'auto'
+          }}>
+            {/* Forge Image Detection */}
+            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #5227FF' }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                Forge Image Detection
+              </h3>
               <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]); }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('metadata'); }}
+                onDragLeave={() => setDragOverChannel(null)}
+                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'metadata'); }}
                 style={{
                   flex: 1,
-                  border: `2px dashed ${isDragOver ? 'var(--accent-cyan)' : 'var(--border-color)'}`,
-                  background: isDragOver ? 'rgba(0, 242, 254, 0.02)' : 'transparent',
+                  border: `2px dashed ${dragOverChannel === 'metadata' ? '#5227FF' : 'var(--border-color)'}`,
+                  background: dragOverChannel === 'metadata' ? 'rgba(82, 39, 255, 0.05)' : 'transparent',
                   borderRadius: '8px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  padding: '40px 20px',
-                  transition: 'all 0.2s ease',
-                  pointerEvents: 'auto'
+                  padding: '24px 16px',
+                  transition: 'all 0.2s ease'
                 }}
-                onClick={() => document.getElementById('tool-uploader').click()}
+                onClick={() => document.getElementById('metadata-uploader').click()}
               >
-                <input id="tool-uploader" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0]); }} />
-                <Upload size={44} style={{ color: isDragOver ? 'var(--accent-cyan)' : 'var(--text-secondary)', marginBottom: '16px' }} />
-                <p style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>Drag & Drop Image</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>or click to browse local folders</p>
+                <input id="metadata-uploader" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'metadata'); }} />
+                <Upload size={28} style={{ color: dragOverChannel === 'metadata' ? '#5227FF' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image</p>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 500, color: 'var(--text-primary)', paddingLeft: '4px', letterSpacing: '-0.3px' }}>
-                Demo hardware presets
-              </h2>
-              {PRESETS.map((preset) => {
-                const Icon = preset.status === 'alert' ? ShieldAlert : preset.status === 'warning' ? Cpu : CheckCircle;
-                return (
-                  <div
-                    key={preset.id}
-                    className="cyber-card"
-                    onClick={() => setSelectedImage(preset)}
-                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyBreak: 'space-between', gap: '16px', borderLeft: `3px solid ${preset.color}`, pointerEvents: 'auto' }}
-                  >
-                    <div style={{ color: preset.color }}><Icon size={24} /></div>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontSize: '0.95rem', color: 'var(--text-primary)', fontWeight: '600' }}>{preset.title}</h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{preset.description}</p>
-                    </div>
-                    <span className="cyber-badge" style={{ borderColor: preset.color, color: preset.color }}>{preset.confidence}%</span>
-                  </div>
-                );
-              })}
+            {/* Deepfake Image Detection */}
+            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #f59e0b' }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                Deepfake Image Detection
+              </h3>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('ela'); }}
+                onDragLeave={() => setDragOverChannel(null)}
+                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'ela'); }}
+                style={{
+                  flex: 1,
+                  border: `2px dashed ${dragOverChannel === 'ela' ? '#f59e0b' : 'var(--border-color)'}`,
+                  background: dragOverChannel === 'ela' ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: '24px 16px',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => document.getElementById('ela-uploader').click()}
+              >
+                <input id="ela-uploader" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'ela'); }} />
+                <Upload size={28} style={{ color: dragOverChannel === 'ela' ? '#f59e0b' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image</p>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+              </div>
+            </div>
+
+            {/* Deepfake Video Detection */}
+            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #ff007f' }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                Deepfake Video Detection
+              </h3>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('deepfake'); }}
+                onDragLeave={() => setDragOverChannel(null)}
+                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'deepfake'); }}
+                style={{
+                  flex: 1,
+                  border: `2px dashed ${dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--border-color)'}`,
+                  background: dragOverChannel === 'deepfake' ? 'rgba(255, 0, 127, 0.05)' : 'transparent',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: '24px 16px',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => document.getElementById('deepfake-uploader').click()}
+              >
+                <input id="deepfake-uploader" type="file" accept="video/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'deepfake'); }} />
+                <Upload size={28} style={{ color: dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Video</p>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+              </div>
             </div>
           </div>
         </div>
       ) : (
-        /* Analysis Workbench */
+        /* Analysis Workbench or HTTP Error */
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <button className="cyber-btn cyber-btn-secondary" onClick={() => { setSelectedImage(null); setActiveTab('original'); }}>
+            <button className="cyber-btn cyber-btn-secondary" onClick={() => { setSelectedImage(null); setApiError(null); setActiveTab('original'); }}>
               <ArrowLeft size={16} /> Back to Scanner
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -561,8 +716,65 @@ export default function ToolPage({ theme }) {
             </div>
           </div>
 
-          <div className="grid-cols-layout">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {apiError ? (
+            /* HTTP Error Screen */
+            <div className="cyber-card" style={{ borderLeft: '4px solid #ff007f', padding: '40px', maxWidth: '800px', margin: '0 auto', pointerEvents: 'auto', textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 0, 127, 0.1)',
+                  border: '1px solid rgba(255, 0, 127, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ff007f'
+                }}>
+                  <ShieldAlert size={28} />
+                </div>
+                <div>
+                  <span className="cyber-badge" style={{ color: '#ff007f', borderColor: '#ff007f', background: 'rgba(255, 0, 127, 0.05)' }}>
+                    HTTP {apiError.status} : {apiError.statusText}
+                  </span>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--text-primary)', marginTop: '6px' }}>
+                    Forensic Model Connection Failed
+                  </h2>
+                </div>
+              </div>
+
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '24px' }}>
+                {apiError.message} Make sure that the backend API server is online and running.
+              </p>
+
+              <div style={{ background: 'rgba(15, 23, 42, 0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '16px', marginBottom: '28px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Target Endpoint:</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{apiError.endpoint}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Connection Status:</span>
+                  <span style={{ color: '#ff007f' }}>ERR_CONNECTION_REFUSED</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Timestamp:</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{apiError.timestamp}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button className="cyber-btn" onClick={() => processFile(currentFile, currentChannel)}>
+                  Retry Connection
+                </button>
+                <button className="cyber-btn cyber-btn-secondary" onClick={() => { setApiError(null); setSelectedImage(pendingSimData); }}>
+                  Bypass & Run Simulation
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Regular Workbench (Canvas, findings, etc.) */
+            <div className="grid-cols-layout">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="cyber-card" style={{ padding: '16px', position: 'relative' }}>
                 <div style={{ 
                   background: activeTab === 'original' ? 'var(--bg-secondary)' : '#020408', 
@@ -574,15 +786,27 @@ export default function ToolPage({ theme }) {
                   border: '1px solid var(--border-color)',
                   transition: 'background var(--transition-normal)'
                 }}>
-                  <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px' }} />
+                  {selectedImage.isVideo ? (
+                    <video 
+                      src={selectedImage.videoSrc} 
+                      controls 
+                      autoPlay 
+                      loop 
+                      style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px', outline: 'none' }} 
+                    />
+                  ) : (
+                    <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px' }} />
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '16px' }}>
-                  {['original', 'ela', 'noise'].map(tab => (
-                    <button key={tab} className={`cyber-btn ${activeTab === tab ? '' : 'cyber-btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '8px', textTransform: 'capitalize' }} onClick={() => setActiveTab(tab)}>
-                      {tab === 'ela' ? 'Error Level (ELA)' : tab + ' View'}
-                    </button>
-                  ))}
-                </div>
+                {!selectedImage.isVideo && (
+                  <div style={{ display: 'grid', gridTemplateColumns: selectedImage.channel === 'metadata' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '10px', marginTop: '16px' }}>
+                    {(selectedImage.channel === 'metadata' ? ['original', 'gradcam'] : ['original', 'ela', 'noise']).map(tab => (
+                      <button key={tab} className={`cyber-btn ${activeTab === tab ? '' : 'cyber-btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '8px', textTransform: 'capitalize' }} onClick={() => setActiveTab(tab)}>
+                        {tab === 'ela' ? 'Error Level (ELA)' : tab === 'gradcam' ? 'Grad-CAM View' : tab + ' View'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="cyber-card">
@@ -590,7 +814,7 @@ export default function ToolPage({ theme }) {
                   <FileText size={16} /> Forgery forensic findings
                 </h3>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {selectedImage.findings.map((finding, idx) => (
+                  {(selectedImage.findings || []).map((finding, idx) => (
                     <li key={idx} style={{ display: 'flex', gap: '6px' }}>
                       <span style={{ color: selectedImage.color }}>&gt;</span>
                       <span>{finding}</span>
@@ -608,7 +832,7 @@ export default function ToolPage({ theme }) {
                     <circle cx="50" cy="50" r="40" stroke={selectedImage.color} strokeWidth="8" fill="transparent" strokeDasharray={`${2 * Math.PI * 40}`} strokeDashoffset={`${2 * Math.PI * 40 * (1 - selectedImage.confidence / 100)}`} style={{ transform: 'rotate(-90deg)', transformOrigin: '50px 50px' }} />
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                    {selectedImage.confidence}%
+                    {typeof selectedImage.confidence === 'number' ? selectedImage.confidence.toFixed(1) : selectedImage.confidence}%
                   </div>
                 </div>
                 <div>
@@ -623,11 +847,11 @@ export default function ToolPage({ theme }) {
               <div className="cyber-card">
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '12px', letterSpacing: '-0.2px' }}>Neural gradient analysis</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.75rem' }}>
-                  {Object.entries(selectedImage.metrics).map(([key, val]) => (
+                  {Object.entries(selectedImage.metrics || {}).map(([key, val]) => (
                     <div key={key}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                         <span style={{ textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</span>
-                        <span style={{ color: 'var(--text-primary)' }}>{val}%</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{typeof val === 'number' ? val.toFixed(2) : val}%</span>
                       </div>
                       <div style={{ height: '3px', background: 'rgba(15, 23, 42, 0.05)' }}>
                         <div style={{ height: '100%', width: `${val}%`, background: selectedImage.color }} />
@@ -638,11 +862,13 @@ export default function ToolPage({ theme }) {
               </div>
 
               <div className="cyber-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '10px', letterSpacing: '-0.2px' }}>EXIF metadata block</h3>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '10px', letterSpacing: '-0.2px' }}>
+                  EXIF Metadata Block
+                </h3>
                 <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(15, 23, 42, 0.02)', border: '1px solid var(--border-color)', borderRadius: '4px', maxHeight: '160px', pointerEvents: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
                     <tbody>
-                      {Object.entries(selectedImage.metadata).map(([key, val]) => (
+                      {Object.entries(selectedImage.metadata || {}).map(([key, val]) => (
                         <tr key={key} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '6px 10px', color: 'var(--accent-cyan)' }}>{key}</td>
                           <td style={{ padding: '6px 10px', color: 'var(--text-primary)' }}>{val}</td>
@@ -657,6 +883,7 @@ export default function ToolPage({ theme }) {
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 

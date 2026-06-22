@@ -1,7 +1,6 @@
 import React from 'react';
 import { Shield, BrainCircuit, Binary, FileSearch } from 'lucide-react';
-import DecryptedText from './DecryptedText';
-import ScrollStack, { ScrollStackItem } from './ScrollStack';
+import { motion } from 'motion/react';
 
 const SECTIONS = [
   {
@@ -40,9 +39,9 @@ const SECTIONS = [
 
 export default function FeaturesPage() {
   return (
-    <div style={{ position: 'relative', zIndex: 1 }}>
-      {/* Title — outside the scroll stack so it's static */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 0', textAlign: 'center', marginBottom: '10px' }}>
+    <div style={{ position: 'relative', zIndex: 1, paddingBottom: '100px' }}>
+      {/* Title */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 0', textAlign: 'center', marginBottom: '40px' }}>
         <span className="cyber-badge cyber-badge-magenta" style={{ marginBottom: '16px' }}>
           Science Protocol
         </span>
@@ -54,14 +53,7 @@ export default function FeaturesPage() {
           letterSpacing: '-1px',
           marginBottom: '16px'
         }}>
-          <DecryptedText
-            text="Forensics Science Lab"
-            animateOn="view"
-            speed={60}
-            maxIterations={20}
-            sequential
-            revealDirection="start"
-          />
+          Forensics Science Lab
         </h1>
         <p style={{
           color: 'var(--text-secondary)',
@@ -75,117 +67,119 @@ export default function FeaturesPage() {
         </p>
       </div>
 
-      {/* Scroll-stacking cards */}
-      <ScrollStack
-        useWindowScroll
-        itemDistance={120}
-        itemScale={0.04}
-        itemStackDistance={24}
-        stackPosition="15%"
-        scaleEndPosition="8%"
-        baseScale={0.88}
-        rotationAmount={0}
-        blurAmount={0}
-      >
+      {/* Cards list with view animations */}
+      <div style={{
+        maxWidth: '900px',
+        margin: '0 auto',
+        padding: '0 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '32px',
+        pointerEvents: 'auto'
+      }}>
         {SECTIONS.map((section, index) => {
           const Icon = section.icon;
           return (
-            <ScrollStackItem key={index}>
-              <div style={{
-                maxWidth: '900px',
-                margin: '0 auto',
+            <motion.div
+              key={index}
+              initial={{ scale: 0.85, opacity: 0, y: 30 }}
+              whileInView={{ scale: 1, opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.15 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+              style={{
                 background: 'var(--bg-card)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid var(--border-color)',
-                borderLeft: `3px solid ${section.accent}`,
+                borderLeft: `4px solid ${section.accent}`,
                 borderRadius: '16px',
                 padding: '36px 40px',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 gap: '40px',
                 alignItems: 'start'
-              }}>
-                {/* Left column */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '10px',
-                      background: `${section.accent}15`,
-                      border: `1px solid ${section.accent}40`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: section.accent,
-                      flexShrink: 0
-                    }}>
-                      <Icon size={22} />
-                    </div>
-                    <span className="cyber-badge" style={{
-                      borderColor: `${section.accent}50`,
-                      color: section.accent,
-                      background: `${section.accent}10`
-                    }}>
-                      {section.badge}
-                    </span>
-                  </div>
-
-                  <h2 style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '1.5rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    marginBottom: '12px',
-                    letterSpacing: '-0.3px'
-                  }}>
-                    {section.title}
-                  </h2>
-                  <p style={{
-                    fontSize: '0.9rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: '1.7',
-                    fontWeight: 300
-                  }}>
-                    {section.description}
-                  </p>
-                </div>
-
-                {/* Right column — tech specs */}
-                <div style={{
-                  background: 'rgba(82, 39, 255, 0.03)',
-                  padding: '20px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-color)',
-                }}>
-                  <strong style={{
-                    color: section.accent,
+              }}
+            >
+              {/* Left column */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '10px',
+                    background: `${section.accent}15`,
+                    border: `1px solid ${section.accent}40`,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    marginBottom: '12px',
-                    fontSize: '0.7rem',
-                    letterSpacing: '1.5px',
-                    textTransform: 'uppercase',
-                    fontFamily: 'var(--font-display)'
+                    justifyContent: 'center',
+                    color: section.accent,
+                    flexShrink: 0
                   }}>
-                    Technical Specifications
-                  </strong>
-                  <p style={{
-                    fontSize: '0.82rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: '1.7',
-                    fontWeight: 300
+                    <Icon size={22} />
+                  </div>
+                  <span className="cyber-badge" style={{
+                    borderColor: `${section.accent}50`,
+                    color: section.accent,
+                    background: `${section.accent}10`
                   }}>
-                    {section.science}
-                  </p>
+                    {section.badge}
+                  </span>
                 </div>
+
+                <h2 style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.5rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  marginBottom: '12px',
+                  letterSpacing: '-0.3px'
+                }}>
+                  {section.title}
+                </h2>
+                <p style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.7',
+                  fontWeight: 300
+                }}>
+                  {section.description}
+                </p>
               </div>
-            </ScrollStackItem>
+
+              {/* Right column — tech specs */}
+              <div style={{
+                background: 'rgba(82, 39, 255, 0.03)',
+                padding: '20px',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                height: '100%'
+              }}>
+                <strong style={{
+                  color: section.accent,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '12px',
+                  fontSize: '0.7rem',
+                  letterSpacing: '1.5px',
+                  textTransform: 'uppercase',
+                  fontFamily: 'var(--font-display)'
+                }}>
+                  Technical Specifications
+                </strong>
+                <p style={{
+                  fontSize: '0.82rem',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.7',
+                  fontWeight: 300
+                }}>
+                  {section.science}
+                </p>
+              </div>
+            </motion.div>
           );
         })}
-      </ScrollStack>
+      </div>
     </div>
   );
 }

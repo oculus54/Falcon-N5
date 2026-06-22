@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import DarkVeil from './components/DarkVeil';
-import DecryptedText from './components/DecryptedText';
+
 
 import StaggeredMenu from './components/StaggeredMenu';
 import HomePage from './components/HomePage';
@@ -105,14 +105,7 @@ function App() {
             </linearGradient>
           </defs>
         </svg>
-        <span style={{ fontWeight: '600' }}>
-          <DecryptedText
-            text="Falcon-N5"
-            animateOn="hover"
-            speed={80}
-            maxIterations={15}
-          />
-        </span>
+        <span style={{ fontWeight: '600' }}>Falcon-N5</span>
       </a>
 
 

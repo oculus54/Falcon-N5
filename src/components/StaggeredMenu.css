@@ -4,6 +4,7 @@
   height: 100%;
   z-index: 40;
   pointer-events: none;
+  font-family: var(--font-sans);
 }
 
 .staggered-menu-wrapper.fixed-wrapper {
@@ -58,6 +59,7 @@
   padding: 8px 16px;
   cursor: pointer;
   color: var(--text-primary);
+  font-family: var(--font-sans);
   font-weight: 600;
   line-height: 1;
   overflow: visible;
