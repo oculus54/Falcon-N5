@@ -1,7 +1,260 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, ShieldAlert, Cpu, CheckCircle, FileText, Activity, Upload } from 'lucide-react';
+import { Progress } from './animate-ui/components/radix/progress';
 
 const BACKEND_URL = 'http://127.0.0.1:8000'; // Paste your backend URL here (e.g. 'http://127.0.0.1:8000')
+const BACKEND_URL_DEEPFAKE = 'http://127.0.0.1:8001';
+const BACKEND_URL_VIDEO = 'http://localhost:8002';
+
+// Helper canvas filtering functions
+const isDummyVisualization = (src) => {
+  return !src || src.length < 500;
+};
+
+const drawProceduralHistogram = (ctx, width, height, histogramData) => {
+  ctx.fillStyle = '#060814';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Draw grid
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.05)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < width; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+  }
+  for (let y = 0; y < height; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+  }
+
+  const rData = histogramData?.r || [31596, 120, 45, 0, 0];
+  const gData = histogramData?.g || [0, 10, 400, 312, 12];
+  const bData = histogramData?.b || [800, 245, 90, 12, 0];
+
+  const drawChannel = (data, color) => {
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color.replace('1)', '0.15)');
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    
+    const step = width / (data.length - 1);
+    const maxVal = Math.max(...rData, ...gData, ...bData, 1);
+    
+    ctx.moveTo(0, height);
+    for (let i = 0; i < data.length; i++) {
+      const x = i * step;
+      const y = height - (data[i] / maxVal) * (height * 0.7) - 40;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(width, height);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  drawChannel(rData, 'rgba(239, 68, 68, 1)');
+  drawChannel(gData, 'rgba(16, 185, 129, 1)');
+  drawChannel(bData, 'rgba(59, 130, 246, 1)');
+
+  // Label
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('COLOR HISTOGRAM SPECTRUM (R, G, B)', 20, 30);
+};
+
+const drawProceduralFFT = (ctx, width, height, fftData) => {
+  ctx.fillStyle = '#060814';
+  ctx.fillRect(0, 0, width, height);
+
+  // Draw grid
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.05)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < width; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+  }
+  for (let y = 0; y < height; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+  }
+
+  const energies = fftData?.angular_energy || [177.2413, 149.2343, 143.0583];
+
+  // Draw frequency spectrum spikes
+  ctx.strokeStyle = '#00f2fe';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const points = 40;
+  const step = width / points;
+  ctx.moveTo(0, height - 50);
+  
+  for (let i = 0; i <= points; i++) {
+    const x = i * step;
+    let noise = Math.sin(i * 0.5) * 40 + Math.cos(i * 1.2) * 20;
+    if (i % 5 === 0) noise += (energies[i % energies.length] || 100) * 0.4;
+    const y = Math.max(50, height - 100 - Math.abs(noise));
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Center frequency dome
+  const centerGrad = ctx.createRadialGradient(width/2, height/2, 5, width/2, height/2, 120);
+  centerGrad.addColorStop(0, 'rgba(0, 242, 254, 0.4)');
+  centerGrad.addColorStop(0.5, 'rgba(82, 39, 255, 0.15)');
+  centerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = centerGrad;
+  ctx.beginPath();
+  ctx.arc(width/2, height/2, 120, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pulse rings
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(width/2, height/2, 60, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('FFT SPATIAL FREQUENCY MAGNITUDE', 20, 30);
+  ctx.fillText(`ANGULAR ENERGIES: ${energies.map(e => typeof e === 'number' ? e.toFixed(2) : e).join(', ')}`, 20, 50);
+};
+
+const drawProceduralPolar = (ctx, width, height, fftData) => {
+  ctx.fillStyle = '#060814';
+  ctx.fillRect(0, 0, width, height);
+
+  const cX = width / 2;
+  const cY = height / 2;
+  const maxRadius = 150;
+
+  // Radial grid
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.1)';
+  ctx.lineWidth = 1;
+  for (let r = 30; r <= maxRadius; r += 30) {
+    ctx.beginPath();
+    ctx.arc(cX, cY, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Angular grid lines
+  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 6) {
+    ctx.beginPath();
+    ctx.moveTo(cX, cY);
+    ctx.lineTo(cX + Math.cos(angle) * maxRadius, cY + Math.sin(angle) * maxRadius);
+    ctx.stroke();
+  }
+
+  // Draw polar energy map
+  const energies = fftData?.angular_energy || [177.2413, 149.2343, 143.0583];
+  ctx.strokeStyle = '#ff007f';
+  ctx.fillStyle = 'rgba(255, 0, 127, 0.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  const numSectors = 24;
+  for (let i = 0; i <= numSectors; i++) {
+    const angle = (i / numSectors) * Math.PI * 2;
+    const energyBase = energies[i % energies.length] || 150;
+    const radius = Math.min(maxRadius, (energyBase / 200) * 110 + Math.sin(angle * 6) * 12);
+    const x = cX + Math.cos(angle) * radius;
+    const y = cY + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Nodes
+  ctx.fillStyle = '#ff007f';
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const energyBase = energies[i % energies.length] || 150;
+    const radius = (energyBase / 200) * 110 + Math.sin(angle * 6) * 12;
+    ctx.beginPath();
+    ctx.arc(cX + Math.cos(angle) * radius, cY + Math.sin(angle) * radius, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('POLAR ANGULAR DENSITY PROJECTION', 20, 30);
+};
+
+const drawProceduralCombined = (ctx, width, height, imageSrc) => {
+  ctx.fillStyle = '#060814';
+  ctx.fillRect(0, 0, width, height);
+
+  const drawGrid = () => {
+    ctx.strokeStyle = 'rgba(0, 242, 254, 0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < width; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    }
+    for (let y = 0; y < height; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    }
+  };
+
+  if (imageSrc) {
+    const img = new Image();
+    img.src = imageSrc;
+    img.onload = () => {
+      const scale = Math.max(width / img.width, height / img.height);
+      const x = (width / 2) - (img.width / 2) * scale;
+      const y = (height / 2) - (img.height / 2) * scale;
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+      // Overlay combined forensic details
+      ctx.strokeStyle = 'rgba(255, 0, 127, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(40, 40, width - 80, height - 80);
+
+      // Target brackets
+      ctx.strokeStyle = '#00f2fe';
+      ctx.lineWidth = 3;
+      const offset = 40;
+      const size = 15;
+      
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(offset, offset + size); ctx.lineTo(offset, offset); ctx.lineTo(offset + size, offset); ctx.stroke();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(width - offset, offset + size); ctx.lineTo(width - offset, offset); ctx.lineTo(width - offset - size, offset); ctx.stroke();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(offset, height - offset - size); ctx.lineTo(offset, height - offset); ctx.lineTo(offset + size, height - offset); ctx.stroke();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(width - offset, height - offset - size); ctx.lineTo(width - offset, height - offset); ctx.lineTo(width - offset - size, height - offset); ctx.stroke();
+
+      // Fake signature warning scanner line
+      ctx.strokeStyle = 'rgba(0, 242, 254, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(40, height/2);
+      ctx.lineTo(width - 40, height/2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px JetBrains Mono';
+      ctx.fillText('COMBINED FORENSIC SCAN OVERLAY', 20, 30);
+    };
+  } else {
+    drawGrid();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText('COMBINED SCAN (AWAITING IMAGE)', 20, 30);
+  }
+};
+
+const getTabsForChannel = (channel) => {
+  if (channel === 'ela') {
+    return ['original', 'histogram', 'fft_magnitude', 'polar_energy'];
+  } else if (channel === 'metadata') {
+    return ['original', 'gradcam'];
+  } else if (channel === 'deepfake') {
+    return ['original', 'gradcam'];
+  } else {
+    return ['original', 'ela', 'noise'];
+  }
+};
 
 // Helper canvas filtering functions
 const applyGradCamFilter = (ctx, width, height) => {
@@ -296,6 +549,30 @@ export default function ToolPage({ theme }) {
   const [currentFile, setCurrentFile] = useState(null);
   const [currentChannel, setCurrentChannel] = useState('metadata');
   const canvasRef = useRef(null);
+  
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (selectedImage?.status !== 'analyzing') {
+      setProgress(0);
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 100;
+        return prev + 25;
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [selectedImage?.status]);
+
+  useEffect(() => {
+    if (progress >= 100) {
+      const resetTimer = setTimeout(() => setProgress(0), 4000);
+      return () => clearTimeout(resetTimer);
+    }
+  }, [progress]);
 
   useEffect(() => {
     if (!selectedImage || selectedImage.isVideo) return;
@@ -308,31 +585,57 @@ export default function ToolPage({ theme }) {
     canvas.height = height;
 
     if (selectedImage.imageSrc) {
-      const img = new Image();
-      img.src = selectedImage.imageSrc;
-      img.onload = () => {
-        const scale = Math.max(width / img.width, height / img.height);
-        const x = (width / 2) - (img.width / 2) * scale;
-        const y = (height / 2) - (img.height / 2) * scale;
-        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-
-        if (activeTab === 'ela') {
-          applyElaFilter(ctx, width, height);
-        } else if (activeTab === 'noise') {
-          applyNoiseFilter(ctx, width, height);
-        } else if (activeTab === 'gradcam') {
-          if (selectedImage.gradcamSrc) {
-            const gradcamImg = new Image();
-            gradcamImg.src = selectedImage.gradcamSrc;
-            gradcamImg.onload = () => {
-              ctx.clearRect(0, 0, width, height);
-              ctx.drawImage(gradcamImg, x, y, img.width * scale, img.height * scale);
-            };
-          } else {
-            applyGradCamFilter(ctx, width, height);
+      if (selectedImage.channel === 'ela' && activeTab !== 'original') {
+        const visSrc = selectedImage.apiResponse?.visualizations?.[activeTab];
+        if (visSrc && !isDummyVisualization(visSrc)) {
+          const visImg = new Image();
+          visImg.src = visSrc;
+          visImg.onload = () => {
+            ctx.clearRect(0, 0, width, height);
+            const scale = Math.min(width / visImg.width, height / visImg.height);
+            const x = (width / 2) - (visImg.width / 2) * scale;
+            const y = (height / 2) - (visImg.height / 2) * scale;
+            ctx.drawImage(visImg, x, y, visImg.width * scale, visImg.height * scale);
+          };
+        } else {
+          // Draw procedural visualizations for dummy data / simulation
+          if (activeTab === 'combined') {
+            drawProceduralCombined(ctx, width, height, selectedImage.imageSrc);
+          } else if (activeTab === 'histogram') {
+            drawProceduralHistogram(ctx, width, height, selectedImage.apiResponse?.histogram);
+          } else if (activeTab === 'fft_magnitude') {
+            drawProceduralFFT(ctx, width, height, selectedImage.apiResponse?.fft);
+          } else if (activeTab === 'polar_energy') {
+            drawProceduralPolar(ctx, width, height, selectedImage.apiResponse?.fft);
           }
         }
-      };
+      } else {
+        const img = new Image();
+        img.src = selectedImage.imageSrc;
+        img.onload = () => {
+          const scale = Math.max(width / img.width, height / img.height);
+          const x = (width / 2) - (img.width / 2) * scale;
+          const y = (height / 2) - (img.height / 2) * scale;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+          if (activeTab === 'ela') {
+            applyElaFilter(ctx, width, height);
+          } else if (activeTab === 'noise') {
+            applyNoiseFilter(ctx, width, height);
+          } else if (activeTab === 'gradcam') {
+            if (selectedImage.gradcamSrc && !selectedImage.gradcamSrc.endsWith('...')) {
+              const gradcamImg = new Image();
+              gradcamImg.src = selectedImage.gradcamSrc;
+              gradcamImg.onload = () => {
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(gradcamImg, x, y, img.width * scale, img.height * scale);
+              };
+            } else {
+              applyGradCamFilter(ctx, width, height);
+            }
+          }
+        };
+      }
     } else {
       drawProceduralGraphic(ctx, width, height, selectedImage.id, activeTab, theme);
     }
@@ -366,15 +669,29 @@ export default function ToolPage({ theme }) {
     formData.append('file', file);
 
     try {
-      // If BACKEND_URL is not set, throw a direct reference error or connection error to show HTTP Error UI
-      if (!BACKEND_URL) {
-        const error = new Error('Backend URL is not configured in the frontend.');
-        error.status = 503;
-        error.statusText = 'Service Unavailable';
-        throw error;
+      // Determine the API endpoint based on channel
+      let endpoint = '';
+      if (channel === 'deepfake') {
+        endpoint = `${BACKEND_URL_VIDEO}/detect`;
+      } else if (channel === 'ela') {
+        if (!BACKEND_URL_DEEPFAKE) {
+          const error = new Error('Deepfake image backend URL is not configured.');
+          error.status = 503;
+          error.statusText = 'Service Unavailable';
+          throw error;
+        }
+        endpoint = `${BACKEND_URL_DEEPFAKE}/analyze`;
+      } else {
+        if (!BACKEND_URL) {
+          const error = new Error('Backend URL is not configured in the frontend.');
+          error.status = 503;
+          error.statusText = 'Service Unavailable';
+          throw error;
+        }
+        endpoint = `${BACKEND_URL}/analyze`;
       }
 
-      const response = await fetch(`${BACKEND_URL}/analyze`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData, // Send file as multipart/form-data
       });
@@ -396,6 +713,13 @@ export default function ToolPage({ theme }) {
       }
       
       const data = await response.json();
+
+      if (data && (data.success === false || data.success === 'false')) {
+        const error = new Error(data.error || 'The forensic model returned a failure response.');
+        error.status = response.status || 500;
+        error.statusText = response.statusText || 'Internal Server Error';
+        throw error;
+      }
       
       // Read file to get original imageSrc/videoSrc, then map API payload
       const reader = new FileReader();
@@ -403,10 +727,10 @@ export default function ToolPage({ theme }) {
         let status = 'success';
         let color = '#10b981';
         const predLower = (data.prediction || '').toLowerCase();
-        if (predLower.includes('generated') || predLower.includes('tampered') || predLower.includes('fake')) {
+        if (predLower.includes('generated') || predLower.includes('tampered') || predLower.includes('fake') || predLower.includes('ai')) {
           status = 'alert';
           color = '#ff007f';
-        } else if (predLower.includes('warning') || predLower.includes('spliced')) {
+        } else if (predLower.includes('warning') || predLower.includes('spliced') || predLower.includes('no face')) {
           status = 'warning';
           color = '#f59e0b';
         }
@@ -417,28 +741,61 @@ export default function ToolPage({ theme }) {
           description: `Uploaded size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`,
           imageSrc: isVideo ? null : e.target.result,
           videoSrc: isVideo ? e.target.result : null,
-          gradcamSrc: data.gradcam_base64 || null,
+          gradcamSrc: channel === 'ela' ? null : (channel === 'deepfake' ? (data.gradcam_img || null) : (data.gradcam_base64 || null)),
           isVideo: isVideo,
           category: data.prediction || 'Unknown Result',
-          confidence: parseFloat(data.confidence) || 0,
+          confidence: channel === 'deepfake' ? (parseFloat(data.avg_confidence) * 100 || 0) : (parseFloat(data.confidence) || 0),
           status: status,
           color: color,
           channel: channel,
-          metadata: {
+          metadata: channel === 'ela' ? {
+            'File Name': data.image_metadata?.filename || file.name,
+            'Dimensions': data.image_metadata ? `${data.image_metadata.width} x ${data.image_metadata.height}` : 'Unknown',
+            'Model Loaded': data.model_loaded ? 'True' : 'False',
+            'Prediction': data.prediction || 'N/A',
+            'Confidence': `${(parseFloat(data.confidence) || 0).toFixed(2)}%`,
+            'FFT Angular Energy': data.fft?.angular_energy ? data.fft.angular_energy.map(v => typeof v === 'number' ? v.toFixed(4) : v).join(', ') : 'N/A',
+            'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
+          } : (channel === 'deepfake' ? {
+            'File Name': file.name,
+            'File Size': `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            'Format': file.type.replace('video/', '').toUpperCase(),
+            'Prediction': data.prediction || 'N/A',
+            'Average Confidence': `${(parseFloat(data.avg_confidence) * 100 || 0).toFixed(2)}%`,
+            'Top Confidence': `${(parseFloat(data.top_confidence) * 100 || 0).toFixed(2)}%`,
+            'Consistency Diff': `${(parseFloat(data.consistency_diff) * 100 || 0).toFixed(2)}%`,
+            'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
+          } : {
             'File Name': file.name,
             'File Size': `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
             'Format': isVideo ? file.type.replace('video/', '').toUpperCase() : file.type.replace('image/', '').toUpperCase(),
             'Model Engine': 'Swin-Transformer (swin_base_patch4)',
             'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
-          },
-          metrics: data.probabilities || {
+          }),
+          metrics: channel === 'ela' ? (data.probabilities || {
+            'AI-generated': parseFloat(data.confidence) || 0,
+            'Real': 100 - (parseFloat(data.confidence) || 0)
+          }) : (channel === 'deepfake' ? {
+            'Average Confidence': parseFloat(data.avg_confidence) * 100 || 0,
+            'Top Confidence': parseFloat(data.top_confidence) * 100 || 0,
+            'Consistency Difference': parseFloat(data.consistency_diff) * 100 || 0
+          } : (data.probabilities || {
             'Prediction Confidence': parseFloat(data.confidence) || 0
-          },
-          findings: [
+          })),
+          findings: channel === 'ela' ? [
+            `Model prediction: "${data.prediction || 'N/A'}".`,
+            `Confidence level evaluated at ${(parseFloat(data.confidence) || 0).toFixed(2)}%.`,
+            `Multi-spectral analysis visualizations generated.`
+          ] : (channel === 'deepfake' ? [
+            `Model prediction: "${data.prediction || 'N/A'}".`,
+            `Average confidence level: ${(parseFloat(data.avg_confidence) * 100 || 0).toFixed(2)}%.`,
+            `Top frame confidence: ${(parseFloat(data.top_confidence) * 100 || 0).toFixed(2)}%.`,
+            `Consistency difference: ${(parseFloat(data.consistency_diff) * 100 || 0).toFixed(2)}%.`
+          ] : [
             `Model prediction: "${data.prediction || 'N/A'}".`,
             `Confidence level evaluated at ${(parseFloat(data.confidence) || 0).toFixed(2)}%.`,
             `Grad-CAM visualization overlay retrieved successfully.`
-          ],
+          ]),
           apiResponse: data
         };
 
@@ -454,12 +811,14 @@ export default function ToolPage({ theme }) {
     } catch (err) {
       console.warn('API connection failed, returning HTTP error:', err);
       
+      const endpoint = channel === 'ela' ? `${BACKEND_URL_DEEPFAKE}/analyze` : `${BACKEND_URL}/analyze`;
+
       // Construct user-friendly HTTP error screen data
       setApiError({
         status: err.status || 503,
         statusText: err.statusText || 'Service Unavailable',
         message: err.message || 'Failed to establish connection to the remote forensic model. The backend server is currently offline or unreachable.',
-        endpoint: BACKEND_URL ? `${BACKEND_URL}/analyze` : 'unconfigured',
+        endpoint: BACKEND_URL ? endpoint : 'unconfigured',
         timestamp: new Date().toISOString()
       });
 
@@ -543,32 +902,112 @@ export default function ToolPage({ theme }) {
         `Grad-CAM visualization highlights key focus regions.`
       ];
     } else if (channel === 'ela') {
-      userImage.color = '#f59e0b';
-      userImage.category = 'Manipulated';
-      userImage.status = 'warning';
-      userImage.confidence = Math.floor(Math.random() * 15) + 80;
-      userImage.metrics.elaMaxDeviation = userImage.confidence;
-      userImage.metrics.doubleCompression = Math.floor(Math.random() * 15) + 75;
+      const aiProb = Math.round((Math.random() * 10 + 89) * 100) / 100;
+      const realProb = Math.round((100 - aiProb) * 100) / 100;
+      const confidence = aiProb;
+
+      userImage.color = '#ff007f';
+      userImage.category = 'AI-generated';
+      userImage.status = 'alert';
+      userImage.confidence = confidence;
+      userImage.channel = 'ela';
+      
+      userImage.apiResponse = {
+        status: "success",
+        image_metadata: {
+          width: 1920,
+          height: 1080,
+          filename: file.name
+        },
+        model_loaded: true,
+        prediction: "AI-generated",
+        confidence: confidence,
+        probabilities: {
+          "AI-generated": aiProb,
+          "Real": realProb
+        },
+        histogram: {
+          r: [31596, 120, 45, 0, 0], 
+          g: [0, 10, 400, 312, 12], 
+          b: [800, 245, 90, 12, 0] 
+        },
+        fft: {
+          angular_energy: [
+            177.2413 + Math.random() * 5 - 2.5,
+            149.2343 + Math.random() * 5 - 2.5,
+            143.0583 + Math.random() * 5 - 2.5
+          ]
+        },
+        visualizations: {
+          combined: "data:image/png;base64,iVBORw0KGgoAAAANS...",
+          histogram: "data:image/png;base64,iVBORw0KGgoAAAANS...",
+          fft_magnitude: "data:image/png;base64,iVBORw0KGgoAAAANS...",
+          polar_energy: "data:image/png;base64,iVBORw0KGgoAAAANS..."
+        }
+      };
+
+      userImage.metadata = {
+        'File Name': file.name,
+        'Dimensions': '1920 x 1080',
+        'Model Loaded': 'True',
+        'Prediction': 'AI-generated',
+        'FFT Angular Energy': userImage.apiResponse.fft.angular_energy.map(v => v.toFixed(4)).join(', '),
+        'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+
+      userImage.metrics = {
+        'AI-generated': aiProb,
+        'Real': realProb
+      };
+
       userImage.findings = [
-        'Error Level Analysis shows sharp deviation in block 8.',
-        'Localized pixel editing detected near main subjects.',
-        'Double compression signatures indicate resaved asset.'
+        `Model prediction: "AI-generated".`,
+        `Confidence level evaluated at ${confidence.toFixed(2)}%.`,
+        `Multi-spectral analysis visualizations generated.`
       ];
     } else if (channel === 'deepfake') {
-      userImage.color = '#ff007f';
-      userImage.category = 'AI Generated';
-      userImage.status = 'alert';
-      userImage.confidence = Math.floor(Math.random() * 10) + 90;
-      userImage.metrics.ganSignature = userImage.confidence;
-      userImage.metrics.noiseInconsistency = Math.floor(Math.random() * 15) + 75;
-      userImage.findings = isVideo ? [
-        'Deepfake video temporal inconsistency detected.',
-        'Mathematical face warp blending artifacts found.',
-        'Neural fake-generation probability limits exceeded.'
-      ] : [
-        'High frequency GAN generator signature detected.',
-        'Asymmetric biological textures found in facial structures.',
-        'Deepfake synthesis confidence limits exceeded.'
+      const avg = Math.random() * 0.2 + 0.7; // average confidence around 70-90%
+      const top = avg + Math.random() * 0.1;
+      const diff = top - avg;
+      const prediction = avg > 0.5 ? "FAKE" : "REAL";
+
+      userImage.color = prediction === "FAKE" ? '#ff007f' : '#10b981';
+      userImage.category = prediction;
+      userImage.status = prediction === "FAKE" ? 'alert' : 'success';
+      userImage.confidence = avg * 100;
+      userImage.channel = 'deepfake';
+      userImage.gradcamSrc = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="; // small 1x1 base64 png dot
+      
+      userImage.apiResponse = {
+        prediction: prediction,
+        avg_confidence: avg,
+        top_confidence: top,
+        consistency_diff: diff,
+        gradcam_img: userImage.gradcamSrc
+      };
+
+      userImage.metrics = {
+        'Average Confidence': avg * 100,
+        'Top Confidence': top * 100,
+        'Consistency Difference': diff * 100
+      };
+
+      userImage.metadata = {
+        'File Name': file.name,
+        'File Size': `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        'Format': file.type.replace('video/', '').toUpperCase(),
+        'Prediction': prediction,
+        'Average Confidence': `${(avg * 100).toFixed(2)}%`,
+        'Top Confidence': `${(top * 100).toFixed(2)}%`,
+        'Consistency Diff': `${(diff * 100).toFixed(2)}%`,
+        'Timestamp': new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+
+      userImage.findings = [
+        `Model prediction: "${prediction}".`,
+        `Average confidence level: ${(avg * 100).toFixed(2)}%.`,
+        `Top frame confidence: ${(top * 100).toFixed(2)}%.`,
+        `Consistency difference: ${(diff * 100).toFixed(2)}%.`
       ];
     }
 
@@ -581,6 +1020,21 @@ export default function ToolPage({ theme }) {
       setReportGenerating(false);
       alert(`Report generated for ${selectedImage.title}.`);
     }, 1500);
+  };
+
+  const runSimulation = () => {
+    if (!pendingSimData) return;
+    setApiError(null);
+    setSelectedImage({
+      ...pendingSimData,
+      status: 'analyzing', // Keep it analyzing to show loading
+    });
+    setProgress(0);
+
+    // Transition to completed status after 2.5 seconds
+    setTimeout(() => {
+      setSelectedImage(pendingSimData);
+    }, 2500);
   };
 
   const IconHeader = selectedImage?.status === 'alert' ? ShieldAlert : selectedImage?.status === 'warning' ? Cpu : CheckCircle;
@@ -766,7 +1220,7 @@ export default function ToolPage({ theme }) {
                 <button className="cyber-btn" onClick={() => processFile(currentFile, currentChannel)}>
                   Retry Connection
                 </button>
-                <button className="cyber-btn cyber-btn-secondary" onClick={() => { setApiError(null); setSelectedImage(pendingSimData); }}>
+                <button className="cyber-btn cyber-btn-secondary" onClick={runSimulation}>
                   Bypass & Run Simulation
                 </button>
               </div>
@@ -786,25 +1240,67 @@ export default function ToolPage({ theme }) {
                   border: '1px solid var(--border-color)',
                   transition: 'background var(--transition-normal)'
                 }}>
-                  {selectedImage.isVideo ? (
-                    <video 
-                      src={selectedImage.videoSrc} 
-                      controls 
-                      autoPlay 
-                      loop 
-                      style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px', outline: 'none' }} 
-                    />
+                  {selectedImage.status === 'analyzing' ? (
+                    <div style={{ 
+                      width: '100%', 
+                      height: '320px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      padding: '24px'
+                    }}>
+                      <Progress value={progress} style={{ width: '300px' }} className="w-[300px]" />
+                    </div>
+                  ) : selectedImage.isVideo ? (
+                    activeTab === 'gradcam' && selectedImage.gradcamSrc ? (
+                      <img 
+                        src={selectedImage.gradcamSrc} 
+                        style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px', objectFit: 'contain' }} 
+                        alt="Grad-CAM Activation Map"
+                      />
+                    ) : (
+                      <video 
+                        src={selectedImage.videoSrc} 
+                        controls 
+                        autoPlay 
+                        loop 
+                        style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px', outline: 'none' }} 
+                      />
+                    )
                   ) : (
                     <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px' }} />
                   )}
                 </div>
-                {!selectedImage.isVideo && (
-                  <div style={{ display: 'grid', gridTemplateColumns: selectedImage.channel === 'metadata' ? '1fr 1fr' : '1fr 1fr 1fr', gap: '10px', marginTop: '16px' }}>
-                    {(selectedImage.channel === 'metadata' ? ['original', 'gradcam'] : ['original', 'ela', 'noise']).map(tab => (
-                      <button key={tab} className={`cyber-btn ${activeTab === tab ? '' : 'cyber-btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '8px', textTransform: 'capitalize' }} onClick={() => setActiveTab(tab)}>
-                        {tab === 'ela' ? 'Error Level (ELA)' : tab === 'gradcam' ? 'Grad-CAM View' : tab + ' View'}
-                      </button>
-                    ))}
+                {(!selectedImage.isVideo || selectedImage.channel === 'deepfake') && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: selectedImage.channel === 'ela' 
+                      ? 'repeat(auto-fit, minmax(110px, 1fr))' 
+                      : ((selectedImage.channel === 'metadata' || selectedImage.channel === 'deepfake') ? '1fr 1fr' : '1fr 1fr 1fr'),
+                    gap: '10px',
+                    marginTop: '16px'
+                  }}>
+                    {getTabsForChannel(selectedImage.channel).map(tab => {
+                      let label = tab + ' View';
+                      if (tab === 'ela') label = 'Error Level (ELA)';
+                      else if (tab === 'gradcam') label = 'Grad-CAM View';
+                      else if (tab === 'combined') label = 'Combined';
+                      else if (tab === 'histogram') label = 'Color Histogram';
+                      else if (tab === 'fft_magnitude') label = 'FFT Magnitude';
+                      else if (tab === 'polar_energy') label = 'Polar Energy';
+
+                      return (
+                        <button 
+                          key={tab} 
+                          className={`cyber-btn ${activeTab === tab ? '' : 'cyber-btn-secondary'}`} 
+                          style={{ fontSize: '0.7rem', padding: '8px 4px', textTransform: 'uppercase', textAlign: 'center', justifyContent: 'center' }} 
+                          onClick={() => setActiveTab(tab)}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -850,7 +1346,7 @@ export default function ToolPage({ theme }) {
                   {Object.entries(selectedImage.metrics || {}).map(([key, val]) => (
                     <div key={key}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                        <span style={{ textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</span>
+                        <span style={{ textTransform: 'capitalize' }}>{key.includes(' ') || key.includes('(') ? key : key.replace(/([A-Z])/g, ' $1').trim()}</span>
                         <span style={{ color: 'var(--text-primary)' }}>{typeof val === 'number' ? val.toFixed(2) : val}%</span>
                       </div>
                       <div style={{ height: '3px', background: 'rgba(15, 23, 42, 0.05)' }}>
