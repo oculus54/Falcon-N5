@@ -54,3 +54,11 @@
   -webkit-background-clip: text;
   color: transparent;
 }
+
+.text-content * {
+  background: inherit !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { ArrowLeft, ShieldAlert, Cpu, CheckCircle, FileText, Activity, Upload } from 'lucide-react';
-import { Progress } from './animate-ui/components/radix/progress';
+import { gsap } from 'gsap';
 
-const BACKEND_URL = 'http://127.0.0.1:8000'; // Paste your backend URL here (e.g. 'http://127.0.0.1:8000')
-const BACKEND_URL_DEEPFAKE = 'http://127.0.0.1:8001';
+const BACKEND_URL = 'http://localhost:8000'; // Paste your backend URL here (e.g. 'http://127.0.0.1:8000')
+const BACKEND_URL_DEEPFAKE = 'http://localhost:8001';
 const BACKEND_URL_VIDEO = 'http://localhost:8002';
 
 // Helper canvas filtering functions
@@ -539,7 +539,7 @@ const drawProceduralGraphic = (ctx, width, height, presetId, tab, theme) => {
   }
 };
 
-export default function ToolPage({ theme }) {
+export default function ToolPage({ theme, subTool }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState('original');
   const [dragOverChannel, setDragOverChannel] = useState(null);
@@ -566,6 +566,30 @@ export default function ToolPage({ theme }) {
     }, 2000);
     return () => clearInterval(timer);
   }, [selectedImage?.status]);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      if (!selectedImage) {
+        // Animate the scanner headings
+        gsap.fromTo('.gsap-header-el', 
+          { opacity: 0, y: 30, filter: 'blur(10px)' },
+          { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6, ease: 'power3.out', stagger: 0.15 }
+        );
+        // Animate the upload area card(s)
+        gsap.fromTo('.cyber-card', 
+          { opacity: 0, y: 40, filter: 'blur(10px)' },
+          { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, ease: 'power3.out', stagger: 0.15 }
+        );
+      } else if (selectedImage.status !== 'analyzing') {
+        // Animate the results workbench cards
+        gsap.fromTo('.cyber-card', 
+          { opacity: 0, y: 40, filter: 'blur(10px)' },
+          { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.8, ease: 'power3.out', stagger: 0.15 }
+        );
+      }
+    });
+    return () => ctx.revert();
+  }, [selectedImage, subTool]);
 
   useEffect(() => {
     if (progress >= 100) {
@@ -646,9 +670,25 @@ export default function ToolPage({ theme }) {
     setCurrentFile(file);
     setCurrentChannel(channel);
     const isVideo = file.type.startsWith('video/');
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      alert('Please upload an image or video file.');
-      return;
+    
+    // Strict format validation: first two only PNG/JPG, third only MP4
+    if (channel === 'metadata' || channel === 'ela') {
+      const isImg = file.type.match(/image\/(png|jpeg|jpg)/) || file.name.match(/\.(png|jpe?g)$/i);
+      if (!isImg) {
+        alert('Invalid file format. Please upload a PNG or JPG/JPEG image.');
+        return;
+      }
+    } else if (channel === 'deepfake') {
+      const isMp4 = file.type === 'video/mp4' || file.name.match(/\.mp4$/i);
+      if (!isMp4) {
+        alert('Invalid file format. Please upload an MP4 video.');
+        return;
+      }
+    } else {
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        alert('Please upload an image or video file.');
+        return;
+      }
     }
 
     // Show temporary analyzing workbench
@@ -1046,113 +1086,150 @@ export default function ToolPage({ theme }) {
         /* Upload Area */
         <div>
           <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.8px', marginBottom: '12px' }}>
-              Falcon-N5 analysis scanner
+            <h1 className="gsap-header-el" style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.8px', marginBottom: '12px' }}>
+              {subTool === 'forge' && 'Forge Image Forensic Scanner'}
+              {subTool === 'ai' && 'AI Image Forensic Scanner'}
+              {subTool === 'deepfake' && 'Deepfake Video Forensic Scanner'}
+              {!subTool && 'Falcon-N5 analysis scanner'}
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.7', fontWeight: 300 }}>
-              Select a demo preset or upload your own file to inspect EXIF metadata, JPEG Error levels, and generative AI noise signatures.
+            <p className="gsap-header-el" style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.7', fontWeight: 300 }}>
+              {subTool === 'forge' && 'Upload a PNG or JPG/JPEG image to inspect EXIF metadata, camera footprints, and identify image tampering indicators.'}
+              {subTool === 'ai' && 'Analyze pixel structures, color spectrums, and error levels to discover if an image is generated by an artificial intelligence model.'}
+              {subTool === 'deepfake' && 'Scan MP4 videos using Swin-Transformer networks to check frame consistency and trace digital face manipulation patterns.'}
+              {!subTool && 'Select a demo preset or upload your own file to inspect EXIF metadata, JPEG Error levels, and generative AI noise signatures.'}
             </p>
           </div>
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gridTemplateColumns: subTool ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+            maxWidth: subTool ? '600px' : 'none',
+            margin: subTool ? '0 auto' : '0',
             gap: '24px',
             width: '100%',
             pointerEvents: 'auto'
           }}>
             {/* Forge Image Detection */}
-            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #5227FF' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
-                Forge Image Detection
-              </h3>
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('metadata'); }}
-                onDragLeave={() => setDragOverChannel(null)}
-                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'metadata'); }}
-                style={{
-                  flex: 1,
-                  border: `2px dashed ${dragOverChannel === 'metadata' ? '#5227FF' : 'var(--border-color)'}`,
-                  background: dragOverChannel === 'metadata' ? 'rgba(82, 39, 255, 0.05)' : 'transparent',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: '24px 16px',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => document.getElementById('metadata-uploader').click()}
-              >
-                <input id="metadata-uploader" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'metadata'); }} />
-                <Upload size={28} style={{ color: dragOverChannel === 'metadata' ? '#5227FF' : 'var(--text-secondary)', marginBottom: '8px' }} />
-                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image</p>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+            {(!subTool || subTool === 'forge') && (
+              <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #5227FF' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                  Forge Image Detection
+                </h3>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverChannel('metadata'); }}
+                  onDragLeave={() => setDragOverChannel(null)}
+                  onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'metadata'); }}
+                  style={{
+                    flex: 1,
+                    border: `2px dashed ${dragOverChannel === 'metadata' ? '#5227FF' : 'var(--border-color)'}`,
+                    background: dragOverChannel === 'metadata' ? 'rgba(82, 39, 255, 0.05)' : 'transparent',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: '24px 16px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => document.getElementById('metadata-uploader').click()}
+                >
+                  <input id="metadata-uploader" type="file" accept="image/png, image/jpeg, image/jpg" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'metadata'); }} />
+                  <Upload size={28} style={{ color: dragOverChannel === 'metadata' ? '#5227FF' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                  <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image (PNG/JPG)</p>
+                  <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Deepfake Image Detection */}
-            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #f59e0b' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
-                Deepfake Image Detection
-              </h3>
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('ela'); }}
-                onDragLeave={() => setDragOverChannel(null)}
-                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'ela'); }}
-                style={{
-                  flex: 1,
-                  border: `2px dashed ${dragOverChannel === 'ela' ? '#f59e0b' : 'var(--border-color)'}`,
-                  background: dragOverChannel === 'ela' ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: '24px 16px',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => document.getElementById('ela-uploader').click()}
-              >
-                <input id="ela-uploader" type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'ela'); }} />
-                <Upload size={28} style={{ color: dragOverChannel === 'ela' ? '#f59e0b' : 'var(--text-secondary)', marginBottom: '8px' }} />
-                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image</p>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+            {/* AI Image Detection */}
+            {(!subTool || subTool === 'ai') && (
+              <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #f59e0b' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                  AI Image Detection
+                </h3>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverChannel('ela'); }}
+                  onDragLeave={() => setDragOverChannel(null)}
+                  onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'ela'); }}
+                  style={{
+                    flex: 1,
+                    border: `2px dashed ${dragOverChannel === 'ela' ? '#f59e0b' : 'var(--border-color)'}`,
+                    background: dragOverChannel === 'ela' ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: '24px 16px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => document.getElementById('ela-uploader').click()}
+                >
+                  <input id="ela-uploader" type="file" accept="image/png, image/jpeg, image/jpg" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'ela'); }} />
+                  <Upload size={28} style={{ color: dragOverChannel === 'ela' ? '#f59e0b' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                  <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Image (PNG/JPG)</p>
+                  <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Deepfake Video Detection */}
-            <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #ff007f' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
-                Deepfake Video Detection
-              </h3>
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragOverChannel('deepfake'); }}
-                onDragLeave={() => setDragOverChannel(null)}
-                onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'deepfake'); }}
-                style={{
-                  flex: 1,
-                  border: `2px dashed ${dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--border-color)'}`,
-                  background: dragOverChannel === 'deepfake' ? 'rgba(255, 0, 127, 0.05)' : 'transparent',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: '24px 16px',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => document.getElementById('deepfake-uploader').click()}
-              >
-                <input id="deepfake-uploader" type="file" accept="video/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'deepfake'); }} />
-                <Upload size={28} style={{ color: dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--text-secondary)', marginBottom: '8px' }} />
-                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Video</p>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+            {(!subTool || subTool === 'deepfake') && (
+              <div className="cyber-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '260px', borderTop: '4px solid #ff007f' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px', marginTop: '8px' }}>
+                  Deepfake Video Detection
+                </h3>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverChannel('deepfake'); }}
+                  onDragLeave={() => setDragOverChannel(null)}
+                  onDrop={(e) => { e.preventDefault(); setDragOverChannel(null); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0], 'deepfake'); }}
+                  style={{
+                    flex: 1,
+                    border: `2px dashed ${dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--border-color)'}`,
+                    background: dragOverChannel === 'deepfake' ? 'rgba(255, 0, 127, 0.05)' : 'transparent',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: '24px 16px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => document.getElementById('deepfake-uploader').click()}
+                >
+                  <input id="deepfake-uploader" type="file" accept="video/mp4" style={{ display: 'none' }} onChange={(e) => { if (e.target.files.length) processFile(e.target.files[0], 'deepfake'); }} />
+                  <Upload size={28} style={{ color: dragOverChannel === 'deepfake' ? '#ff007f' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                  <p style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Drag & Drop Video (MP4)</p>
+                  <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>or click to upload</p>
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+      ) : selectedImage.status === 'analyzing' && !apiError ? (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: '#000000',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div className="loader-wrapper">
+            {(selectedImage.isVideo ? "Scanning" : "Analyzing").split("").map((char, index) => (
+              <span 
+                key={index} 
+                className="loader-letter" 
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                {char}
+              </span>
+            ))}
+            <div className="loader"></div>
           </div>
         </div>
       ) : (
@@ -1245,12 +1322,24 @@ export default function ToolPage({ theme }) {
                       width: '100%', 
                       height: '320px', 
                       display: 'flex', 
-                      flexDirection: 'column', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      padding: '24px'
+                      padding: '24px',
+                      background: '#04060e',
+                      borderRadius: '8px'
                     }}>
-                      <Progress value={progress} style={{ width: '300px' }} className="w-[300px]" />
+                      <div className="loader-wrapper">
+                        {(selectedImage.isVideo ? "Scanning" : "Analyzing").split("").map((char, index) => (
+                          <span 
+                            key={index} 
+                            className="loader-letter" 
+                            style={{ animationDelay: `${index * 0.1}s` }}
+                          >
+                            {char}
+                          </span>
+                        ))}
+                        <div className="loader"></div>
+                      </div>
                     </div>
                   ) : selectedImage.isVideo ? (
                     activeTab === 'gradcam' && selectedImage.gradcamSrc ? (
@@ -1265,7 +1354,14 @@ export default function ToolPage({ theme }) {
                         controls 
                         autoPlay 
                         loop 
-                        style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '400px', outline: 'none' }} 
+                        style={{ 
+                          width: '100%', 
+                          height: 'auto', 
+                          display: 'block', 
+                          maxHeight: '400px', 
+                          outline: 'none',
+                          background: activeTab === 'original' ? 'var(--bg-secondary)' : '#020408',
+                        }} 
                       />
                     )
                   ) : (
@@ -1383,6 +1479,27 @@ export default function ToolPage({ theme }) {
         </div>
       )}
 
+      {reportGenerating && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(2, 4, 10, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 100
+        }}>
+          <div className="loader-wrapper" style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
+            {"Generating...".split('').map((char, index) => (
+              <span key={index} className="loader-letter" style={{ animationDelay: `${index * 0.1}s`, fontSize: '2.5rem' }}>
+                {char}
+              </span>
+            ))}
+            <div className="loader" style={{ width: '32px', height: '32px' }}></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

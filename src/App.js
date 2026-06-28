@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import DarkVeil from './components/DarkVeil';
+import Lightfall from './components/Lightfall';
 
 
 import StaggeredMenu from './components/StaggeredMenu';
@@ -10,7 +10,16 @@ import FeaturesPage from './components/FeaturesPage';
 
 const menuItems = [
   { label: 'Home', ariaLabel: 'Go to Home Page', link: '#/' },
-  { label: 'Analyze', ariaLabel: 'Go to Tool Page', link: '#/tool' },
+  { 
+    label: 'Analyze', 
+    ariaLabel: 'Go to Tool Page', 
+    link: '#/tool',
+    subItems: [
+      { label: 'Forge Image', ariaLabel: 'Go to Forge Image Detection', link: '#/tool/forge' },
+      { label: 'AI Image', ariaLabel: 'Go to AI Image Detection', link: '#/tool/ai' },
+      { label: 'Deepfake Video', ariaLabel: 'Go to Deepfake Video Detection', link: '#/tool/deepfake' }
+    ]
+  },
   { label: 'Features', ariaLabel: 'Go to Features Page', link: '#/features' }
 ];
 
@@ -22,6 +31,7 @@ const socialItems = [
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
+  const [subTool, setSubTool] = useState(null);
   const theme = 'dark';
 
   useEffect(() => {
@@ -33,10 +43,22 @@ function App() {
       const hash = window.location.hash;
       if (hash === '#/tool') {
         setCurrentPage('tool');
+        setSubTool(null);
+      } else if (hash === '#/tool/forge') {
+        setCurrentPage('tool');
+        setSubTool('forge');
+      } else if (hash === '#/tool/ai') {
+        setCurrentPage('tool');
+        setSubTool('ai');
+      } else if (hash === '#/tool/deepfake') {
+        setCurrentPage('tool');
+        setSubTool('deepfake');
       } else if (hash === '#/features') {
         setCurrentPage('features');
+        setSubTool(null);
       } else {
         setCurrentPage('home');
+        setSubTool(null);
       }
       // Scroll to top on page switch
       window.scrollTo(0, 0);
@@ -53,13 +75,22 @@ function App() {
       
       {/* Fixed Full-Screen Interactive Canvas Background */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
-        <DarkVeil
-          hueShift={0}
-          noiseIntensity={0}
-          scanlineIntensity={0}
+        <Lightfall
+          colors={['#A6C8FF', '#5227FF', '#FF9FFC']}
+          backgroundColor="#0A29FF"
           speed={0.5}
-          scanlineFrequency={0}
-          warpAmount={0}
+          streakCount={2}
+          streakWidth={1}
+          streakLength={1}
+          glow={1}
+          density={0.6}
+          twinkle={1}
+          zoom={3}
+          backgroundGlow={0.5}
+          opacity={1}
+          mouseInteraction={true}
+          mouseStrength={0.5}
+          mouseRadius={1}
         />
       </div>
 
@@ -129,7 +160,7 @@ function App() {
       {/* Page Routing Contents */}
       <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
         {currentPage === 'home' && <HomePage theme={theme} />}
-        {currentPage === 'tool' && <ToolPage theme={theme} />}
+        {currentPage === 'tool' && <ToolPage theme={theme} subTool={subTool} />}
         {currentPage === 'features' && <FeaturesPage theme={theme} />}
       </main>
 

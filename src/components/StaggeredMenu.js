@@ -21,6 +21,7 @@ export const StaggeredMenu = ({
   onMenuClose
 }) => {
   const [open, setOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState({});
   const openRef = useRef(false);
   const panelRef = useRef(null);
   const preLayersRef = useRef(null);
@@ -38,6 +39,17 @@ export const StaggeredMenu = ({
   const toggleBtnRef = useRef(null);
   const busyRef = useRef(false);
   const itemEntranceTweenRef = useRef(null);
+
+  const toggleSubMenu = useCallback((label, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setExpandedItems(prev => ({
+      ...prev,
+      [label]: !prev[label]
+    }));
+  }, []);
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -316,6 +328,7 @@ export const StaggeredMenu = ({
     if (openRef.current) {
       openRef.current = false;
       setOpen(false);
+      setExpandedItems({});
       onMenuClose?.();
       playClose();
       animateIcon(false);
@@ -343,6 +356,29 @@ export const StaggeredMenu = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [closeOnClickAway, open, closeMenu]);
+
+  // Listen for external trigger to open menu + expand a specific item
+  React.useEffect(() => {
+    const handle = (e) => {
+      const label = e.detail?.label;
+      // Open the menu if not already open
+      if (!openRef.current) {
+        openRef.current = true;
+        setOpen(true);
+        onMenuOpen?.();
+        playOpen();
+        animateIcon(true);
+        animateColor(true);
+        animateText(true);
+      }
+      // Expand the requested sub-menu item
+      if (label) {
+        setExpandedItems(prev => ({ ...prev, [label]: true }));
+      }
+    };
+    document.addEventListener('openMenuAndExpand', handle);
+    return () => document.removeEventListener('openMenuAndExpand', handle);
+  }, [playOpen, animateIcon, animateColor, animateText, onMenuOpen]);
 
   return (
     <div
@@ -406,10 +442,80 @@ export const StaggeredMenu = ({
           <ul className="sm-panel-list" data-numbering={displayItemNumbering || undefined}>
             {items && items.length ? (
               items.map((it, idx) => (
-                <li className="sm-panel-itemWrap" key={it.label + idx}>
-                  <a className="sm-panel-item" href={it.link} aria-label={it.ariaLabel} data-index={idx + 1}>
-                    <span className="sm-panel-itemLabel">{it.label}</span>
-                  </a>
+                <li className="sm-panel-itemWrap" key={it.label + idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                  {it.subItems ? (
+                    <>
+                      <div 
+                        className="sm-panel-item-parent-container" 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', width: '100%' }}
+                        onClick={(e) => toggleSubMenu(it.label, e)}
+                      >
+                        <a 
+                          className="sm-panel-item" 
+                          href={it.link} 
+                          aria-label={it.ariaLabel} 
+                          data-index={idx + 1}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleSubMenu(it.label, e);
+                          }}
+                          style={{ flex: 1, paddingRight: '0.5em' }}
+                        >
+                          <span className="sm-panel-itemLabel">{it.label}</span>
+                        </a>
+                        <span 
+                          className={`sm-submenu-arrow ${expandedItems[it.label] ? 'expanded' : ''}`}
+                          style={{
+                            color: 'var(--sm-accent, #5227ff)',
+                            fontSize: '1.2rem',
+                            display: 'inline-block',
+                            pointerEvents: 'none',
+                            userSelect: 'none'
+                          }}
+                        >
+                          ▼
+                        </span>
+                      </div>
+                      <div 
+                        className={`sm-submenu-container ${expandedItems[it.label] ? 'expanded' : ''}`}
+                        style={{
+                          maxHeight: expandedItems[it.label] ? '300px' : '0px',
+                          overflow: 'hidden',
+                          opacity: expandedItems[it.label] ? 1 : 0,
+                          paddingLeft: '1.5rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.4rem',
+                          marginTop: expandedItems[it.label] ? '0.5rem' : '0'
+                        }}
+                      >
+                        {it.subItems.map((sub, sIdx) => (
+                          <a
+                            key={sub.label + sIdx}
+                            className="sm-submenu-item"
+                            href={sub.link}
+                            aria-label={sub.ariaLabel}
+                            onClick={closeMenu}
+                            style={{
+                              fontSize: '1.4rem',
+                              color: 'var(--text-secondary)',
+                              textDecoration: 'none',
+                              fontFamily: 'var(--font-display)',
+                              fontWeight: '400',
+                              padding: '6px 0',
+                              display: 'block'
+                            }}
+                          >
+                            {sub.label}
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <a className="sm-panel-item" href={it.link} aria-label={it.ariaLabel} data-index={idx + 1} onClick={closeMenu}>
+                      <span className="sm-panel-itemLabel">{it.label}</span>
+                    </a>
+                  )}
                 </li>
               ))
             ) : (
